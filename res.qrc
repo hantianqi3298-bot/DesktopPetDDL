@@ -1,0 +1,28 @@
+<RCC>
+    <qresource prefix="/">
+        <file>assets/angry.gif</file>
+        <file>assets/happy.gif</file>
+        <file>assets/idle.gif</file>
+        <file>assets/study.gif</file>
+        <file>assets/warn.gif</file>
+        <file>assets/fall.gif</file>
+        <file>assets/lift.gif</file>
+        <file>assets/run.gif</file>
+        <file>assets/play.gif</file>
+        <file>assets/1angry.gif</file>
+        <file>assets/1eat.gif</file>
+        <file>assets/1fall.gif</file>
+        <file>assets/1run.gif</file>
+        <file>assets/1happy.gif</file>
+        <file>assets/1lift.gif</file>
+        <file>assets/1play.gif</file>
+        <file>assets/1study.gif</file>
+        <file>assets/1warn.gif</file>
+        <file>assets/left1.gif</file>
+        <file>assets/1left1.gif</file>
+        <file>assets/1right1.gif</file>
+        <file>assets/right1.gif</file>
+        <file>assets/eat.gif</file>
+        <file>assets/1idle.gif</file>
+    </qresource>
+</RCC>
