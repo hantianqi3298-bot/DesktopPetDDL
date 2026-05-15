@@ -1,4 +1,4 @@
-﻿#include "ddldialog.h"
+#include "ddldialog.h"
 #include "ui_ddldialog.h"
 
 #include <QBrush>
@@ -20,7 +20,9 @@
 
 #include <algorithm>
 
+// 本文件负责 DDL 管理窗口的任务校验、列表刷新和 JSON 持久化。
 namespace {
+// 生成 DDL 数据文件路径；如果 data 目录不存在，则自动创建。
 QString dataFilePath()
 {
     const QString dataPath = QCoreApplication::applicationDirPath() + "/data";
@@ -31,6 +33,7 @@ QString dataFilePath()
     return dataPath + "/ddl_data.json";
 }
 
+// 将距离截止时间的秒数转换为列表中显示的中文剩余时间。
 QString remainingText(qint64 seconds)
 {
     if (seconds < 0) {
@@ -54,6 +57,7 @@ QString remainingText(qint64 seconds)
 }
 }
 
+// 初始化 DDL 管理窗口，绑定按钮事件，并读取历史任务。
 DDLDialog::DDLDialog(QWidget *parent)
     : QDialog(parent)
     , tasks()
@@ -89,11 +93,13 @@ DDLDialog::~DDLDialog()
     delete ui;
 }
 
+// 返回任务列表引用，供主窗口定时检查 DDL 状态。
 QVector<DDLTask> &DDLDialog::getTasks()
 {
     return tasks;
 }
 
+// 添加任务：校验输入、处理同名任务、排序并保存到本地文件。
 void DDLDialog::addTask()
 {
     const QString taskName = ui->taskEdit->text().trimmed();
@@ -138,6 +144,7 @@ void DDLDialog::addTask()
     ui->deadlineEdit->setDateTime(QDateTime::currentDateTime().addSecs(3600));
 }
 
+// 删除当前选中的任务，删除前弹窗确认，避免误操作。
 void DDLDialog::deleteTask()
 {
     const int row = ui->taskList->currentRow();
@@ -164,6 +171,7 @@ void DDLDialog::deleteTask()
     emit taskDeleted(task.name);
 }
 
+// 将任务列表写入 JSON 文件，保证程序重启后 DDL 不丢失。
 void DDLDialog::saveTasksToFile()
 {
     QJsonArray array;
@@ -185,6 +193,7 @@ void DDLDialog::saveTasksToFile()
     file.write(QJsonDocument(array).toJson(QJsonDocument::Indented));
 }
 
+// 从 JSON 文件读取历史任务，并过滤空名称或无效时间的记录。
 void DDLDialog::loadTasksFromFile()
 {
     QFile file(dataFilePath());
@@ -219,6 +228,7 @@ void DDLDialog::loadTasksFromFile()
     sortTasksByDeadline();
 }
 
+// 刷新任务列表，并用颜色和粗体区分截止、紧急和普通任务。
 void DDLDialog::refreshTaskListUI()
 {
     ui->taskList->clear();
@@ -252,6 +262,7 @@ void DDLDialog::refreshTaskListUI()
     }
 }
 
+// 按截止时间从早到晚排序，让最近的 DDL 显示在前面。
 void DDLDialog::sortTasksByDeadline()
 {
     std::sort(tasks.begin(), tasks.end(), [](const DDLTask &a, const DDLTask &b) {
