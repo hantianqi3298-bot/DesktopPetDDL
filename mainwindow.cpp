@@ -1,4 +1,4 @@
-﻿#include "mainwindow.h"
+#include "mainwindow.h"
 #include "ui_mainwindow.h"
 
 #include <QAction>
@@ -14,12 +14,14 @@
 #include <QRandomGenerator>
 #include <QScreen>
 
+// 本文件负责桌宠主窗口：动画绘制、鼠标交互、DDL 提醒、番茄钟和养成状态。
 #ifdef Q_OS_WIN
 #include <windows.h>
 #include <dwmapi.h>
 #endif
 
 namespace {
+//鼠标全局坐标获取方式。
 QPoint globalMousePos(QMouseEvent *event)
 {
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
@@ -29,6 +31,7 @@ QPoint globalMousePos(QMouseEvent *event)
 #endif
 }
 
+// Windows 平台下移除系统边框、圆角和阴影，使桌宠更像真正贴在桌面上。
 void removeSystemWindowBorder(QWidget *widget)
 {
 #ifdef Q_OS_WIN
@@ -88,6 +91,7 @@ void removeSystemWindowBorder(QWidget *widget)
 }
 }
 
+// 构造函数：初始化透明窗口、动画、DDL 窗口、气泡和所有定时器。
 MainWindow::MainWindow(QWidget *parent)
     : QWidget(parent)
     , ui(new Ui::MainWindow)
@@ -119,6 +123,7 @@ MainWindow::MainWindow(QWidget *parent)
     , hunger(100)
     , energy(100)
 {
+    // 基础窗口属性：无边框、置顶、工具窗口和无系统阴影。
     setWindowFlags(Qt::FramelessWindowHint
                    | Qt::WindowStaysOnTopHint
                    | Qt::Tool
@@ -141,10 +146,12 @@ MainWindow::MainWindow(QWidget *parent)
     removeSystemWindowBorder(this);
     QTimer::singleShot(0, this, [this]() { removeSystemWindowBorder(this); });
 
+    // QMovie 播放 GIF，frameChanged 信号驱动窗口重绘。
     connect(currentMovie, &QMovie::frameChanged, this, &MainWindow::onPetFrameChanged);
     changePetState(QStringLiteral(":/assets/idle.gif"));
     QTimer::singleShot(0, this, &MainWindow::placePetAtBottomRight);
 
+    // DDLDialog 独立于桌宠主窗口，避免继承透明窗口样式。
     ddlDialog->setAttribute(Qt::WA_DeleteOnClose, false);
     connect(ddlDialog, &DDLDialog::taskAdded, this, [this](const QString &taskName, const QDateTime &) {
         markUserOperation();
@@ -159,6 +166,7 @@ MainWindow::MainWindow(QWidget *parent)
         restorePetState();
     });
 
+    // 多个定时器分别负责 DDL 检查、番茄钟、运动、状态和随机行为。
     connect(ddlCheckTimer, &QTimer::timeout, this, &MainWindow::checkDDLTasks);
     ddlCheckTimer->start(10000);
 
@@ -198,6 +206,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(bubbleTimer, &QTimer::timeout, bubbleLabel, &QLabel::hide);
 }
 
+// 析构函数：释放独立创建的气泡窗口和 DDL 窗口。
 MainWindow::~MainWindow()
 {
     if (bubbleLabel) {
@@ -213,6 +222,7 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
+// 切换桌宠 GIF 状态；人形态下会优先寻找带 1 前缀的资源。
 void MainWindow::changePetState(const QString &gifPath)
 {
     QString actualPath = gifPath;
@@ -242,6 +252,7 @@ void MainWindow::changePetState(const QString &gifPath)
     currentMovie->start();
 }
 
+// 临时动画结束后，根据 DDL、番茄钟和养成状态恢复合适的动画。
 void MainWindow::restorePetState()
 {
     if (hasUnacknowledgedDDL) {
@@ -257,6 +268,7 @@ void MainWindow::restorePetState()
     }
 }
 
+// 鼠标按下：记录拖拽起点并启动长按检测。
 void MainWindow::mousePressEvent(QMouseEvent *event)
 {
     if (event->button() != Qt::LeftButton) {
@@ -276,6 +288,7 @@ void MainWindow::mousePressEvent(QMouseEvent *event)
     event->accept();
 }
 
+// 鼠标移动：更新桌宠位置，并记录释放时的初速度。
 void MainWindow::mouseMoveEvent(QMouseEvent *event)
 {
     if (!(event->buttons() & Qt::LeftButton)) {
@@ -306,6 +319,7 @@ void MainWindow::mouseMoveEvent(QMouseEvent *event)
     event->accept();
 }
 
+// 鼠标释放：区分点击、拖拽释放、边缘吸附和下落。
 void MainWindow::mouseReleaseEvent(QMouseEvent *event)
 {
     if (event->button() != Qt::LeftButton) {
@@ -359,6 +373,7 @@ void MainWindow::mouseReleaseEvent(QMouseEvent *event)
     event->accept();
 }
 
+// 长按超过阈值后进入“被拎起”状态。
 void MainWindow::onLongPressTimeout()
 {
     if (!isPressing) {
@@ -369,6 +384,7 @@ void MainWindow::onLongPressTimeout()
     changePetState(QStringLiteral(":/assets/lift.gif"));
 }
 
+// 右键菜单：集中提供 DDL 管理、番茄钟、投喂、互动和退出功能。
 void MainWindow::contextMenuEvent(QContextMenuEvent *event)
 {
     QMenu menu(this);
@@ -467,6 +483,7 @@ void MainWindow::contextMenuEvent(QContextMenuEvent *event)
     }
 }
 
+// 程序启动后将桌宠放置在当前屏幕右下角。
 void MainWindow::placePetAtBottomRight()
 {
     QScreen *screen = QGuiApplication::screenAt(pos());
@@ -480,6 +497,7 @@ void MainWindow::placePetAtBottomRight()
     move(rect.right() - width() - 20, rect.bottom() - height() + 1);
 }
 
+// 每 30ms 更新桌宠运动，包括自动走动、自由下落和边界碰撞。
 void MainWindow::updatePetMotion()
 {
     if (isDragging || isPressing) {
@@ -561,6 +579,7 @@ void MainWindow::updatePetMotion()
     move(nextPos.toPoint());
 }
 
+// 根据是否落地、是否有交互、番茄钟和自动走动开关判断运动模式。
 void MainWindow::updateMotionMode(bool onGround)
 {
     if (motionMode == PetMotionMode::Hanging) {
@@ -586,6 +605,7 @@ void MainWindow::updateMotionMode(bool onGround)
     }
 }
 
+// 周期性降低饱腹和体力，并在状态过低时触发提醒。
 void MainWindow::updatePetStatus()
 {
     addHunger(-1);
@@ -602,6 +622,7 @@ void MainWindow::updatePetStatus()
     }
 }
 
+// 随机触发说话、转向或开心动作，让桌宠更有生命感。
 void MainWindow::triggerRandomAction()
 {
     if (isDragging || isPressing || interactionTimer->isActive()) {
@@ -625,6 +646,7 @@ void MainWindow::triggerRandomAction()
     }
 }
 
+// 普通点击视为摸头互动；悬挂状态下点击会让桌宠掉落。
 void MainWindow::handleClickInteraction()
 {
     if (motionMode == PetMotionMode::Falling) {
@@ -644,6 +666,7 @@ void MainWindow::handleClickInteraction()
     interactionTimer->start(1200);
 }
 
+// 投喂小鱼干：提高饱腹和心情。
 void MainWindow::feedPet()
 {
     markUserOperation();
@@ -654,6 +677,7 @@ void MainWindow::feedPet()
     interactionTimer->start(5000);
 }
 
+// 逗猫玩：提高心情，但会消耗体力。
 void MainWindow::playWithPet()
 {
     markUserOperation();
@@ -664,6 +688,7 @@ void MainWindow::playWithPet()
     interactionTimer->start(3500);
 }
 
+// 用气泡显示当前养成数值和运动状态。
 void MainWindow::showPetStatus()
 {
     const QString text = QStringLiteral("心情：%1/100\n饱腹：%2/100\n体力：%3/100\n状态：%4")
@@ -674,6 +699,7 @@ void MainWindow::showPetStatus()
     showBubble(text, 3000);
 }
 
+// 显示桌宠气泡，并在指定时间后自动隐藏。
 void MainWindow::showBubble(const QString &text, int msec)
 {
     if (!bubbleLabel) {
@@ -686,6 +712,7 @@ void MainWindow::showBubble(const QString &text, int msec)
     bubbleTimer->start(msec);
 }
 
+// 根据桌宠当前位置更新气泡位置，并避免气泡超出屏幕。
 void MainWindow::updateBubblePosition()
 {
     if (!bubbleLabel) {
@@ -708,6 +735,7 @@ void MainWindow::updateBubblePosition()
     bubbleLabel->move(bubbleX, bubbleY);
 }
 
+// 记录最近一次用户操作，用于控制自动走动和睡眠逻辑。
 void MainWindow::markUserOperation()
 {
     lastOperationTimeMs = QDateTime::currentMSecsSinceEpoch();
@@ -717,6 +745,7 @@ void MainWindow::markUserOperation()
     hasUnacknowledgedDDL = false;
 }
 
+// 将运动枚举转换为用户可读的中文描述。
 QString MainWindow::motionModeText() const
 {
     switch (motionMode) {
@@ -734,21 +763,25 @@ QString MainWindow::motionModeText() const
     return QStringLiteral("未知");
 }
 
+// 将心情值限制在 0 到 100 之间。
 void MainWindow::addMood(int delta)
 {
     mood = qBound(0, mood + delta, 100);
 }
 
+// 将饱腹值限制在 0 到 100 之间。
 void MainWindow::addHunger(int delta)
 {
     hunger = qBound(0, hunger + delta, 100);
 }
 
+// 将体力值限制在 0 到 100 之间。
 void MainWindow::addEnergy(int delta)
 {
     energy = qBound(0, energy + delta, 100);
 }
 
+// 将番茄钟剩余秒数格式化为 mm:ss。
 QString MainWindow::formatSeconds(int seconds) const
 {
     seconds = qMax(0, seconds);
@@ -757,6 +790,7 @@ QString MainWindow::formatSeconds(int seconds) const
         .arg(seconds % 60, 2, 10, QChar('0'));
 }
 
+// 生成右键菜单中显示的番茄钟状态文本。
 QString MainWindow::pomodoroStatusText() const
 {
     if (pomodoroMode == PomodoroMode::Idle) {
@@ -769,6 +803,7 @@ QString MainWindow::pomodoroStatusText() const
     return QStringLiteral("当前状态：%1，剩余 %2").arg(modeText, formatSeconds(pomodoroSecondsRemaining));
 }
 
+// 开始 25 分钟专注计时，桌宠切换为学习状态。
 void MainWindow::startFocusPomodoro()
 {
     markUserOperation();
@@ -780,6 +815,7 @@ void MainWindow::startFocusPomodoro()
     pomodoroTimer->start(1000);
 }
 
+// 开始 5 分钟休息计时，桌宠切换为开心状态。
 void MainWindow::startBreakPomodoro()
 {
     markUserOperation();
@@ -791,6 +827,7 @@ void MainWindow::startBreakPomodoro()
     pomodoroTimer->start(1000);
 }
 
+// 暂停当前番茄钟。
 void MainWindow::pausePomodoro()
 {
     if (pomodoroMode == PomodoroMode::Idle || isPomodoroPaused) {
@@ -801,6 +838,7 @@ void MainWindow::pausePomodoro()
     showBubble(QStringLiteral("番茄钟已暂停。"), 3000);
 }
 
+// 继续已暂停的番茄钟。
 void MainWindow::resumePomodoro()
 {
     if (pomodoroMode == PomodoroMode::Idle || !isPomodoroPaused) {
@@ -812,6 +850,7 @@ void MainWindow::resumePomodoro()
     showBubble(QStringLiteral("番茄钟继续。"), 3000);
 }
 
+// 取消当前番茄钟并恢复普通状态。
 void MainWindow::stopPomodoro()
 {
     if (pomodoroMode == PomodoroMode::Idle) {
@@ -826,6 +865,7 @@ void MainWindow::stopPomodoro()
     showBubble(QStringLiteral("番茄钟已取消。"), 3000);
 }
 
+// 每秒更新番茄钟倒计时，并在结束时给出提醒。
 void MainWindow::updatePomodoro()
 {
     if (pomodoroMode == PomodoroMode::Idle || isPomodoroPaused) {
@@ -860,6 +900,7 @@ void MainWindow::updatePomodoro()
     }
 }
 
+// 定时检查 DDL：24 小时内提醒，已截止则切换为更焦急的状态。
 void MainWindow::checkDDLTasks()
 {
     QVector<DDLTask> &tasks = ddlDialog->getTasks();
@@ -909,6 +950,7 @@ void MainWindow::checkDDLTasks()
     }
 }
 
+// GIF 每帧刷新时保存当前图像，并根据透明通道裁剪窗口形状。
 void MainWindow::onPetFrameChanged()
 {
     if (!currentMovie || currentMovie->state() != QMovie::Running) {
@@ -934,6 +976,7 @@ void MainWindow::onPetFrameChanged()
     update();
 }
 
+// 自绘桌宠当前帧，同时清空透明背景，避免矩形残影。
 void MainWindow::paintEvent(QPaintEvent *event)
 {
     Q_UNUSED(event);
@@ -949,12 +992,14 @@ void MainWindow::paintEvent(QPaintEvent *event)
     }
 }
 
+// 窗口显示后再次移除系统边框，避免部分系统环境下样式恢复。
 void MainWindow::showEvent(QShowEvent *event)
 {
     QWidget::showEvent(event);
     removeSystemWindowBorder(this);
 }
 
+// 在猫形态和人形态之间切换，并恢复当前应显示的状态。
 void MainWindow::toggleHumanForm()
 {
     isHumanForm = !isHumanForm;
@@ -963,6 +1008,7 @@ void MainWindow::toggleHumanForm()
     restorePetState();
 }
 
+// 桌宠移动时同步更新气泡位置。
 void MainWindow::moveEvent(QMoveEvent *event)
 {
     QWidget::moveEvent(event);
